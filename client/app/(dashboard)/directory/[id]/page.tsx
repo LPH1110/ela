@@ -1,5 +1,9 @@
+"use client";
+
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
+import { useEffect, useState, use } from "react";
+import { api } from "@/lib/api";
 import {
     ChevronRight,
     Edit2,
@@ -35,37 +39,54 @@ type Employee = {
     jobLogs: JobLog[];
 };
 
-async function getEmployee(id: string): Promise<Employee | null> {
-    try {
-        const res = await fetch(`http://localhost:5000/api/employees/${id}`, {
-            cache: 'no-store'
-        });
-        if (!res.ok) return null;
-        const json = await res.json();
-        return json.data;
-    } catch (e) {
-        return null;
-    }
-}
+export default function EmployeeProfilePage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = use(params);
+    const router = useRouter();
+    const [employee, setEmployee] = useState<Employee | null>(null);
+    const [loading, setLoading] = useState(true);
 
-export default async function EmployeeProfilePage({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = await params;
-    const employee = await getEmployee(id);
+    useEffect(() => {
+        const fetchEmployee = async () => {
+            try {
+                const res = await api.get(`/employees/${id}`);
+                if (!res.ok) {
+                    if (res.status === 404) router.push("/directory");
+                    return;
+                }
+                const json = await res.json();
+                setEmployee(json.data);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchEmployee();
+    }, [id, router]);
+
+    if (loading) {
+        return <div className="p-8 text-center text-muted-foreground">Loading employee data...</div>;
+    }
 
     if (!employee) {
-        notFound();
+        return <div className="p-8 text-center text-destructive">Employee not found</div>;
     }
 
-    // Mock data for UI fidelity
-    const performance = "4.8/5";
-    const tenure = "1.4y";
-    const stockOps = "Vesting";
-    const phoneNumber = "+1 (555) 012-3456";
-    const location = "New York, NY";
-    const reportsTo = "Sarah Jenkins";
+    // Derive dynamic values
+    const hireDateObj = new Date(employee.createdAt);
+    const msInYear = 1000 * 60 * 60 * 24 * 365.25;
+    const tenureYears = ((Date.now() - hireDateObj.getTime()) / msInYear).toFixed(1);
+    const tenure = `${tenureYears}y`;
 
-    const avatarUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuBp34tSvaxpcqm0jQpZRmwxZEb5U3U2Ysv2Qk3YngMCzmq7H6dXmHsHtS9r_IbJ-Xc0IVu1qZrRkHY149pZMzWzjC95_NcBSknYrZ4M1xPpHw8KInfJ7XPjXcJizYJGx2JuKaZC6ga0Td0w4gonEZ4eSq-bn9BmkiTJ-Rg1wfmSWvf0J-qcg7rOSyrfyMLKhlRD6bSfOkKPY0vmt4Bco6JekGgMnyMl7X6DwdmVr1uCCT8iWAleeoLMmGt5gT4r2jZHmmaRXcquosRb";
-    const managerAvatarUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuCjuLWeeqAhD3Gv2OaOG-4M0lpdyKZFJtN8WMWYLuoX-g4Isfe4Cr6TT1vBP_7YzAh2zRWgcvFuldSHB4lI0yDwCnrO7kh8S7gW0o3HtBQHF0inGjtqK1Lgb3FsyNQXjpbmcRDcfNE53ELtr5WjrHEsoRIlORCxo8CTBA9q_SCGm3eFc-5E4l1_25uCTaNr4NACqU5exnNZFoUhDxoNHeoxCgc9wFwAwtyjXWlAj67jOs2l9OLsALMuP5aSz5Jil42cRfAytvr5P-0n";
+    // Placeholders for fields not currently returned by backend API
+    const performance = "N/A";
+    const stockOps = "N/A";
+    const phoneNumber = "N/A";
+    const location = "N/A";
+    const reportsTo = "N/A";
+
+    const nameParts = employee.fullName.trim().split(/\s+/);
+    const initials = nameParts.length > 0 ? nameParts.map(part => part[0]).join("").toUpperCase().slice(0, 2) : "EE";
 
     const formattedHireDate = new Date(employee.createdAt).toLocaleDateString("en-US", {
         month: "short",
@@ -109,12 +130,8 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
                     {/* Profile Card */}
                     <section className="bg-card border border-border rounded-xl p-8 flex flex-col items-center text-center shadow-sm">
                         <div className="relative mb-6">
-                            <div className="w-32 h-32 rounded-full border-4 border-background shadow-sm overflow-hidden bg-muted">
-                                <img
-                                    className={`w-full h-full object-cover ${isOffboarded ? 'grayscale' : ''}`}
-                                    alt={employee.fullName}
-                                    src={avatarUrl}
-                                />
+                            <div className="w-32 h-32 rounded-full border-4 border-background shadow-sm overflow-hidden bg-primary/10 flex items-center justify-center text-4xl font-bold text-primary">
+                                {initials}
                             </div>
                             <div className={`absolute bottom-1 right-1 w-6 h-6 border-2 border-background rounded-full ${isOffboarded ? 'bg-zinc-400' : 'bg-emerald-500'}`} title={employee.status}></div>
                         </div>
@@ -170,8 +187,8 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-medium text-muted-foreground">Reports To</span>
                                 <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full overflow-hidden bg-muted">
-                                        <img className="w-full h-full object-cover" alt="Manager" src={managerAvatarUrl} />
+                                    <div className="w-6 h-6 rounded-full overflow-hidden bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">
+                                        N/A
                                     </div>
                                     <span className="text-sm font-medium text-foreground">{reportsTo}</span>
                                 </div>
@@ -241,47 +258,9 @@ export default async function EmployeeProfilePage({ params }: { params: Promise<
                                         </div>
                                     ))
                                 ) : (
-                                    <>
-                                        {/* Mock Fallback 1 */}
-                                        <div className="relative flex items-start gap-6">
-                                            <div className="absolute left-0 flex items-center justify-center w-10 h-10 rounded-full bg-primary border-4 border-background shadow-sm z-10 text-primary-foreground">
-                                                <CheckCircle2 size={18} />
-                                            </div>
-                                            <div className="pl-12">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <p className="text-sm font-semibold text-foreground">Google Workspace account created</p>
-                                                    <span className="text-xs font-medium text-muted-foreground">• Oct 15, 2023</span>
-                                                </div>
-                                                <p className="text-xs font-medium text-muted-foreground">Provisioning agent completed workspace setup for primary domain.</p>
-                                            </div>
+                                        <div className="p-4 text-sm text-muted-foreground italic">
+                                            No lifecycle events recorded yet.
                                         </div>
-                                        {/* Mock Fallback 2 */}
-                                        <div className="relative flex items-start gap-6">
-                                            <div className="absolute left-0 flex items-center justify-center w-10 h-10 rounded-full bg-primary border-4 border-background shadow-sm z-10 text-primary-foreground">
-                                                <Network size={18} />
-                                            </div>
-                                            <div className="pl-12">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <p className="text-sm font-semibold text-foreground">Slack account provisioned</p>
-                                                    <span className="text-xs font-medium text-muted-foreground">• Oct 15, 2023</span>
-                                                </div>
-                                                <p className="text-xs font-medium text-muted-foreground">Default channels assigned: #general, #engineering, #announcements.</p>
-                                            </div>
-                                        </div>
-                                        {/* Mock Fallback 3 */}
-                                        <div className="relative flex items-start gap-6">
-                                            <div className="absolute left-0 flex items-center justify-center w-10 h-10 rounded-full bg-muted border-4 border-background shadow-sm z-10 text-muted-foreground">
-                                                <Play size={18} />
-                                            </div>
-                                            <div className="pl-12">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <p className="text-sm font-semibold text-foreground">Onboarding initiated</p>
-                                                    <span className="text-xs font-medium text-muted-foreground">• Oct 14, 2023</span>
-                                                </div>
-                                                <p className="text-xs font-medium text-muted-foreground">System trigger received from Greenhouse recruitment integration.</p>
-                                            </div>
-                                        </div>
-                                    </>
                                 )}
                             </div>
 

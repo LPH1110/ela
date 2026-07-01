@@ -2,118 +2,128 @@ import { Request, Response } from 'express';
 import prisma from '../config/prisma';
 import { onboardingQueue } from '../queues/onboarding.queue';
 import { offboardingQueue } from '../queues/offboarding.queue';
+import { AppError, ErrorCodes, asyncHandler } from '../utils/errors';
 
 export class EmployeeController {
   
-  static async createEmployee(req: Request, res: Response) {
-    try {
-      const { fullName, personalEmail, department } = req.body;
-      
-      if (!fullName || !personalEmail || !department) {
-        return res.status(400).json({ error: 'Missing required fields' });
+  static createEmployee = asyncHandler(async (req: Request, res: Response) => {
+    const { fullName, personalEmail, department } = req.body;
+    const organizationId = req.user?.orgId;
+    
+    if (!fullName || !personalEmail || !department) {
+      throw new AppError(400, ErrorCodes.VALIDATION_ERROR, 'Missing required fields');
+    }
+    if (!organizationId) {
+      throw new AppError(403, ErrorCodes.FORBIDDEN_NO_ORG, 'Forbidden: No organization context');
+    }
+
+    const employee = await prisma.employee.create({
+      data: {
+        fullName,
+        personalEmail,
+        department,
+        status: 'ONBOARDING',
+        organizationId
       }
+    });
 
-      const employee = await prisma.employee.create({
-        data: {
-          fullName,
-          personalEmail,
-          department,
-          status: 'ONBOARDING'
-        }
-      });
+    // Add to onboarding queue
+    await onboardingQueue.add('onboardEmployee', { employeeId: employee.id, organizationId });
 
-      // Add to onboarding queue
-      await onboardingQueue.add('onboardEmployee', { employeeId: employee.id });
+    return res.status(201).json({ message: 'Employee created and onboarding started', data: employee });
+  });
 
-      return res.status(201).json({ message: 'Employee created and onboarding started', data: employee });
-    } catch (error) {
-      console.error('Error in createEmployee:', error);
-      return res.status(500).json({ error: 'Internal server error' });
+  static getEmployees = asyncHandler(async (req: Request, res: Response) => {
+    const organizationId = req.user?.orgId;
+    if (!organizationId) {
+      throw new AppError(403, ErrorCodes.FORBIDDEN_NO_ORG, 'Forbidden: No organization context');
     }
-  }
 
-  static async getEmployees(req: Request, res: Response) {
-    try {
-      const employees = await prisma.employee.findMany({
-        orderBy: { createdAt: 'desc' }
-      });
-      
-      return res.status(200).json({ data: employees });
-    } catch (error) {
-      console.error('Error in getEmployees:', error);
-      return res.status(500).json({ error: 'Internal server error' });
+    const employees = await prisma.employee.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    return res.status(200).json({ data: employees });
+  });
+
+  static getEmployee = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const organizationId = req.user?.orgId;
+    
+    if (!organizationId) {
+      throw new AppError(403, ErrorCodes.FORBIDDEN_NO_ORG, 'Forbidden: No organization context');
     }
-  }
 
-  static async getEmployee(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const employee = await prisma.employee.findUnique({
-        where: { id },
-        include: { jobLogs: { orderBy: { createdAt: 'desc' } } }
-      });
-      
-      if (!employee) {
-        return res.status(404).json({ error: 'Employee not found' });
-      }
-
-      return res.status(200).json({ data: employee });
-    } catch (error) {
-      console.error('Error in getEmployee:', error);
-      return res.status(500).json({ error: 'Internal server error' });
+    const employee = await prisma.employee.findUnique({
+      where: { id, organizationId },
+      include: { jobLogs: { orderBy: { createdAt: 'desc' } } }
+    });
+    
+    if (!employee) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Employee not found');
     }
-  }
 
-  static async getEmployeeLogs(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      
-      const logs = await prisma.jobLog.findMany({
-        where: { employeeId: id },
-        orderBy: { createdAt: 'desc' }
-      });
-      
-      return res.status(200).json({ data: logs });
-    } catch (error) {
-      console.error('Error in getEmployeeLogs:', error);
-      return res.status(500).json({ error: 'Internal server error' });
+    return res.status(200).json({ data: employee });
+  });
+
+  static getEmployeeLogs = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const organizationId = req.user?.orgId;
+    
+    if (!organizationId) {
+      throw new AppError(403, ErrorCodes.FORBIDDEN_NO_ORG, 'Forbidden: No organization context');
     }
-  }
 
-  static async getGlobalLogs(req: Request, res: Response) {
-    try {
-      const logs = await prisma.jobLog.findMany({
-        include: { employee: true },
-        orderBy: { createdAt: 'desc' }
-      });
-      return res.status(200).json({ data: logs });
-    } catch (error) {
-      console.error('Error in getGlobalLogs:', error);
-      return res.status(500).json({ error: 'Internal server error' });
+    // Ensure the employee belongs to this org
+    const employee = await prisma.employee.findUnique({ where: { id, organizationId } });
+    if (!employee) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Employee not found');
     }
-  }
 
-  static async offboardEmployee(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
+    const logs = await prisma.jobLog.findMany({
+      where: { employeeId: id },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    return res.status(200).json({ data: logs });
+  });
 
-      const employee = await prisma.employee.findUnique({ where: { id } });
-      
-      if (!employee) {
-        return res.status(404).json({ error: 'Employee not found' });
-      }
-
-      if (employee.status === 'OFFBOARDED') {
-        return res.status(400).json({ error: 'Employee is already offboarded' });
-      }
-
-      // Add to offboarding queue
-      await offboardingQueue.add('offboardEmployee', { employeeId: employee.id });
-
-      return res.status(200).json({ message: 'Offboarding sequence initiated' });
-    } catch (error) {
-      console.error('Error in offboardEmployee:', error);
-      return res.status(500).json({ error: 'Internal server error' });
+  static getGlobalLogs = asyncHandler(async (req: Request, res: Response) => {
+    const organizationId = req.user?.orgId;
+    if (!organizationId) {
+      throw new AppError(403, ErrorCodes.FORBIDDEN_NO_ORG, 'Forbidden: No organization context');
     }
-  }
+
+    const logs = await prisma.jobLog.findMany({
+      where: { employee: { organizationId } },
+      include: { employee: true },
+      orderBy: { createdAt: 'desc' }
+    });
+    return res.status(200).json({ data: logs });
+  });
+
+  static offboardEmployee = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const organizationId = req.user?.orgId;
+
+    if (!organizationId) {
+      throw new AppError(403, ErrorCodes.FORBIDDEN_NO_ORG, 'Forbidden: No organization context');
+    }
+
+    const employee = await prisma.employee.findUnique({ where: { id, organizationId } });
+    
+    if (!employee) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Employee not found');
+    }
+
+    if (employee.status === 'OFFBOARDED') {
+      throw new AppError(400, ErrorCodes.EMPLOYEE_ALREADY_OFFBOARDED, 'Employee is already offboarded');
+    }
+
+    // Add to offboarding queue
+    await offboardingQueue.add('offboardEmployee', { employeeId: employee.id, organizationId });
+
+    return res.status(200).json({ message: 'Offboarding sequence initiated' });
+  });
 }

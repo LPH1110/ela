@@ -1,12 +1,19 @@
+"use client";
+
 import { OnboardingModal } from "@/components/modals";
 import { Button } from "@/components/ui/button";
 import { Users, UserPlus, UserMinus, Network, Plus, RefreshCw } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 export default function Home() {
+  const { user } = useAuth();
+
   return (
     <div className="flex flex-col gap-6">
       <div className="mb-2">
-        <h2 className="text-2xl font-semibold text-foreground mb-1">Welcome back, Admin.</h2>
+        <h2 className="text-2xl font-semibold text-foreground mb-1">
+          Welcome back{user ? `, ${user.fullName.split(' ')[0]}` : ""}.
+        </h2>
         <p className="text-sm text-muted-foreground">Here is the latest overview of your HR and IT operations.</p>
       </div>
 

@@ -24,9 +24,12 @@ import { useForm, useWatch } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { DatePicker } from "../ui/date-picker";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 interface OnboardingModalProps {
     children: ReactNode;
+    onSuccess?: () => void;
 }
 
 interface OnboardingFormValues {
@@ -36,7 +39,7 @@ interface OnboardingFormValues {
     startDate: string;
 }
 
-export default function OnboardingModal({ children }: OnboardingModalProps) {
+export default function OnboardingModal({ children, onSuccess }: OnboardingModalProps) {
     const [open, setOpen] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const router = useRouter();
@@ -76,29 +79,45 @@ export default function OnboardingModal({ children }: OnboardingModalProps) {
     const onSubmit = async (data: OnboardingFormValues) => {
         setSubmitError(null);
         try {
-            const response = await fetch("http://localhost:5000/api/employees", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    fullName: data.fullName,
-                    personalEmail: data.personalEmail,
-                    department: data.department,
-                }),
+            const response = await api.post("/employees", {
+                fullName: data.fullName,
+                personalEmail: data.personalEmail,
+                department: data.department,
             });
 
             if (!response.ok) {
                 const errData = await response.json();
-                throw new Error(errData.error || "Failed to start onboarding flow");
+                throw new Error(errData.error?.message || "Failed to start onboarding flow");
             }
 
+            // If HR, automatically invite them to the ELA platform
+            let inviteMsg = "";
+            if (data.department === "HR") {
+                try {
+                    const inviteRes = await api.post("/invitations", { 
+                        email: data.personalEmail, 
+                        role: "MEMBER" 
+                    });
+                    
+                    if (inviteRes.ok) {
+                        inviteMsg = " and platform invitation sent";
+                    }
+                } catch (inviteErr) {
+                    console.error("Failed to send platform invite:", inviteErr);
+                    toast.error("Employee added, but failed to send platform invitation.");
+                }
+            }
+
+            toast.success(`Onboarding initiated for ${data.fullName}${inviteMsg}!`);
             reset();
             setOpen(false);
+            if (onSuccess) onSuccess();
             router.refresh();
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error creating employee:", error);
-            setSubmitError(error instanceof Error ? error.message : "Something went wrong");
+            const msg = error.message || "Something went wrong";
+            setSubmitError(msg);
+            toast.error(msg);
         }
     };
 
@@ -247,6 +266,15 @@ export default function OnboardingModal({ children }: OnboardingModalProps) {
                                     </div>
                                     <span className="text-[10px] font-medium opacity-70">Workspace</span>
                                 </div>
+                                
+                                {department === "HR" && (
+                                    <div className="flex flex-col items-center gap-1 group cursor-help ml-2 border-l border-border/50 pl-6" title="ELA Platform Access">
+                                        <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/30 flex items-center justify-center text-primary transition-colors">
+                                            <Rocket size={20} />
+                                        </div>
+                                        <span className="text-[10px] font-bold text-primary opacity-90">ELA Access</span>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

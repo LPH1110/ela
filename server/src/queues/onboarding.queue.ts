@@ -1,6 +1,7 @@
 import { Queue, Worker, Job } from 'bullmq';
 import { redisConfig } from '../config/redis';
 import prisma from '../config/prisma';
+import { EmailService } from '../services/email.service';
 
 export const onboardingQueue = new Queue('onboardingQueue', { connection: redisConfig });
 
@@ -32,11 +33,25 @@ export const onboardingWorker = new Worker('onboardingQueue', async (job: Job) =
   });
 
   // Finally update employee status
-  await prisma.employee.update({
+  const employee = await prisma.employee.update({
     where: { id: employeeId },
-    data: { status: 'ACTIVE' }
+    data: { status: 'ACTIVE' },
+    include: { organization: true }
   });
   
+  // Send email notification to the new employee
+  if (employee.personalEmail) {
+    try {
+        await EmailService.sendOnboardingWelcome(
+            employee.personalEmail, 
+            employee.fullName, 
+            employee.organization.name
+        );
+    } catch (emailErr) {
+        console.error(`[Onboarding Worker] Failed to send email to ${employee.personalEmail}`, emailErr);
+    }
+  }
+
   console.log(`[Onboarding Worker] Successfully onboarded employee: ${employeeId}`);
 }, { connection: redisConfig });
 
