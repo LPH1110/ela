@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Kinetic ELA - Admin Console",
+  title: "ELA - Employee Lifecycle Automation Platform",
   description: "Employee Lifecycle Automation Platform",
 };
 
@@ -26,7 +26,7 @@ export default function RootLayout({
         <div className="flex-1 flex flex-col md:ml-[280px] min-w-0">
           <Header />
           <main className="flex-1 p-4 md:p-8 overflow-auto custom-scrollbar">
-            <div className="max-w-[1440px] mx-auto w-full">
+            <div className="container mx-auto w-full">
               {children}
             </div>
           </main>

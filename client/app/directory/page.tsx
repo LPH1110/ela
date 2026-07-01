@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import EmployeeTable, { Employee } from "@/components/directory/employee-table";
 
-const employees: Employee[] = [
+export const dynamic = "force-dynamic";
+
+const mockEmployees: Employee[] = [
     {
         id: "EMP-0012",
         name: "Alex Rivera",
@@ -32,7 +34,59 @@ const employees: Employee[] = [
     },
 ];
 
-export default function EmployeeDirectoryPage() {
+interface DbEmployee {
+    id: string;
+    fullName: string;
+    personalEmail: string;
+    department: string;
+    status: "ONBOARDING" | "ACTIVE" | "OFFBOARDED";
+}
+
+async function getEmployees(): Promise<Employee[]> {
+    try {
+        const response = await fetch("http://localhost:5000/api/employees", {
+            cache: "no-store",
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to fetch employees from backend");
+        }
+
+        const result = await response.json();
+        const dbEmployees: DbEmployee[] = result.data || [];
+
+        if (dbEmployees.length === 0) {
+            return mockEmployees;
+        }
+
+        return dbEmployees.map((emp) => {
+            let status: Employee["status"] = "Active";
+            if (emp.status === "ONBOARDING") status = "Onboarding";
+            else if (emp.status === "OFFBOARDED") status = "Offboarded";
+
+            const nameParts = emp.fullName.trim().split(/\s+/);
+            const initials = nameParts.length > 0
+                ? nameParts.map(part => part[0]).join("").toUpperCase().slice(0, 2)
+                : "EE";
+
+            return {
+                id: emp.id,
+                name: emp.fullName,
+                email: emp.personalEmail,
+                department: emp.department,
+                status: status,
+                initials: initials,
+            };
+        });
+    } catch (error) {
+        console.error("Error loading employees from server:", error);
+        return mockEmployees;
+    }
+}
+
+export default async function EmployeeDirectoryPage() {
+    const employees = await getEmployees();
+
     return (
         <div className="space-y-6">
             {/* Page Header Area */}

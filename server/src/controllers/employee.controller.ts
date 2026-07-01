@@ -45,6 +45,25 @@ export class EmployeeController {
     }
   }
 
+  static async getEmployee(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const employee = await prisma.employee.findUnique({
+        where: { id },
+        include: { jobLogs: { orderBy: { createdAt: 'desc' } } }
+      });
+      
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee not found' });
+      }
+
+      return res.status(200).json({ data: employee });
+    } catch (error) {
+      console.error('Error in getEmployee:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
   static async getEmployeeLogs(req: Request, res: Response) {
     try {
       const { id } = req.params;

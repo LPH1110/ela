@@ -1,9 +1,29 @@
+"use client";
+
+import { useState } from "react";
 import { Bell, Menu } from "lucide-react";
-import Image from "next/image";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { SidebarContent } from "./sidebar";
 
 export default function Header() {
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
     return (
-        <header className="bg-background border-b border-border sticky top-0 z-40 flex justify-end items-center h-16 px-6">
+        <header className="bg-background border-b border-border sticky top-0 z-40 flex justify-between md:justify-end items-center h-16 px-6">
+            <div className="md:hidden flex items-center">
+                <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+                    <SheetTrigger asChild>
+                        <button className="text-muted-foreground hover:text-primary transition-colors cursor-pointer p-1 -ml-2 rounded-md">
+                            <Menu size={24} />
+                            <span className="sr-only">Toggle mobile menu</span>
+                        </button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="w-[280px] p-4 pt-6 flex flex-col gap-0 border-r border-border" showCloseButton={false}>
+                        <SidebarContent onNavClick={() => setMobileMenuOpen(false)} />
+                    </SheetContent>
+                </Sheet>
+            </div>
+
             <div className="flex items-center gap-4">
                 <button className="text-muted-foreground hover:text-primary transition-colors relative">
                     <Bell size={22} />

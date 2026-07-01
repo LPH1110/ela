@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -65,7 +66,7 @@ export default function EmployeeTable({ initialEmployees }: EmployeeTableProps) 
             {/* Filters & Controls Bar (Minimalist) */}
             <div className="flex flex-wrap items-center gap-3 pb-2">
                 {/* Search Input */}
-                <div className="flex items-center bg-card rounded-md px-3 py-1.5 border border-border focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all shadow-sm w-full md:w-64">
+                <div className="flex items-center bg-card rounded-md px-3 py-2.5 border border-border focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all shadow-sm w-full md:w-64">
                     <Search size={16} className="text-muted-foreground mr-2" />
                     <input
                         className="bg-transparent border-none focus:ring-0 text-sm p-0 w-full text-foreground placeholder:text-muted-foreground outline-none"
@@ -79,7 +80,7 @@ export default function EmployeeTable({ initialEmployees }: EmployeeTableProps) 
                 {/* Department Filter */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline">
                             <Filter size={14} className="mr-2" />
                             <span>Department</span>
                             <ChevronDown size={14} className="ml-2" />
@@ -98,7 +99,7 @@ export default function EmployeeTable({ initialEmployees }: EmployeeTableProps) 
                 {/* Status Filter */}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline">
                             <Filter size={14} className="mr-2" />
                             <span>Status</span>
                             <ChevronDown size={14} className="ml-2" />
@@ -190,9 +191,11 @@ export default function EmployeeTable({ initialEmployees }: EmployeeTableProps) 
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-48">
-                                                    <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
-                                                        <Eye size={16} /> View Profile
-                                                    </DropdownMenuItem>
+                                                    <Link href={`/directory/${emp.id}`}>
+                                                        <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
+                                                            <Eye size={16} /> View Profile
+                                                        </DropdownMenuItem>
+                                                    </Link>
                                                     <DropdownMenuSeparator />
 
                                                     {/* Conditional Action Buttons based on Status */}
