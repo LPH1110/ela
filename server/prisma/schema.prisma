@@ -1,0 +1,52 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum EmployeeStatus { 
+  ONBOARDING
+  ACTIVE
+  OFFBOARDED 
+}
+
+enum JobStatus { 
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED 
+}
+
+model Employee {
+  id            String         @id @default(uuid())
+  fullName      String
+  personalEmail String
+  companyEmail  String?
+  department    String
+  status        EmployeeStatus @default(ONBOARDING)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  jobLogs       JobLog[]
+}
+
+model Integration {
+  id           String   @id @default(uuid())
+  provider     String   // e.g., "GITHUB", "SLACK"
+  encryptedKey String
+  iv           String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
+
+model JobLog {
+  id         String     @id @default(uuid())
+  employeeId String
+  employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  action     String
+  status     JobStatus  @default(PENDING)
+  message    String?
+  createdAt  DateTime   @default(now())
+}
