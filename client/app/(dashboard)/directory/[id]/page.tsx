@@ -20,6 +20,7 @@ import {
     Info
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import OffboardingSheet from "@/components/modals/offboarding-sheet";
 
 type JobLog = {
     id: string;
@@ -45,22 +46,23 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
     const [employee, setEmployee] = useState<Employee | null>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchEmployee = async () => {
-            try {
-                const res = await api.get(`/employees/${id}`);
-                if (!res.ok) {
-                    if (res.status === 404) router.push("/directory");
-                    return;
-                }
-                const json = await res.json();
-                setEmployee(json.data);
-            } catch (e) {
-                console.error(e);
-            } finally {
-                setLoading(false);
+    const fetchEmployee = async () => {
+        try {
+            const res = await api.get(`/employees/${id}`);
+            if (!res.ok) {
+                if (res.status === 404) router.push("/directory");
+                return;
             }
-        };
+            const json = await res.json();
+            setEmployee(json.data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         fetchEmployee();
     }, [id, router]);
 
@@ -115,9 +117,20 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                         <Edit2 size={16} /> Edit Profile
                     </Button>
                     {!isOffboarded && (
-                        <Button variant="destructive" className="flex items-center gap-2">
-                            <UserX size={16} /> Trigger Offboarding
-                        </Button>
+                        <OffboardingSheet 
+                            employee={{ 
+                                id: employee.id, 
+                                name: employee.fullName, 
+                                email: employee.personalEmail, 
+                                department: employee.department, 
+                                initials 
+                            }}
+                            onSuccess={fetchEmployee}
+                        >
+                            <Button variant="destructive" className="flex items-center gap-2">
+                                <UserX size={16} /> Trigger Offboarding
+                            </Button>
+                        </OffboardingSheet>
                     )}
                 </div>
             </div>

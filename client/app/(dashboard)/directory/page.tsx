@@ -101,7 +101,7 @@ export default function EmployeeDirectoryPage() {
             {isLoading ? (
                 <div className="p-8 text-center text-muted-foreground">Loading employee directory...</div>
             ) : (
-                <EmployeeTable initialEmployees={employees} />
+                <EmployeeTable initialEmployees={employees} onRefresh={loadEmployees} />
             )}
         </div>
     );

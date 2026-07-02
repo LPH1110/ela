@@ -36,9 +36,10 @@ export type Employee = {
 
 interface EmployeeTableProps {
     initialEmployees: Employee[];
+    onRefresh?: () => void;
 }
 
-export default function EmployeeTable({ initialEmployees }: EmployeeTableProps) {
+export default function EmployeeTable({ initialEmployees, onRefresh }: EmployeeTableProps) {
     const [searchTerm, setSearchTerm] = useState("");
     const [departmentFilter, setDepartmentFilter] = useState("All Departments");
     const [statusFilter, setStatusFilter] = useState("All Statuses");
@@ -200,7 +201,16 @@ export default function EmployeeTable({ initialEmployees }: EmployeeTableProps) 
 
                                                     {/* Conditional Action Buttons based on Status */}
                                                     {emp.status === "Active" && (
-                                                        <OffboardingSheet>
+                                                        <OffboardingSheet 
+                                                            employee={{ 
+                                                                id: emp.id, 
+                                                                name: emp.name, 
+                                                                email: emp.email, 
+                                                                department: emp.department, 
+                                                                initials: emp.initials 
+                                                            }}
+                                                            onSuccess={onRefresh}
+                                                        >
                                                             {/* Cần e.preventDefault() để giữ Dropdown mở lúc Sheet kích hoạt */}
                                                             <DropdownMenuItem
                                                                 onSelect={(e) => e.preventDefault()}
