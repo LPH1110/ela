@@ -1,5 +1,9 @@
 "use client";
 
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
     MessageSquare,
@@ -14,6 +18,22 @@ import {
     AlertCircle
 } from "lucide-react";
 import { IntegrationSetupModal, IntegrationPlatform } from "@/components/modals/integration-setup-modal";
+import { IntegrationMappingsModal } from "@/components/modals/integration-mappings-modal";
+
+interface IntegrationData {
+    id: string;
+    provider: string;
+    metadata: Record<string, unknown>;
+    isActive: boolean;
+    createdAt: string;
+    mappings: Array<{
+        id: string;
+        department: string;
+        resourceId: string;
+        resourceName: string;
+        resourceType: string;
+    }>;
+}
 
 // --- KHAI BÁO CẤU HÌNH CHO TỪNG NỀN TẢNG ---
 const platformConfigs: Record<string, IntegrationPlatform> = {
@@ -72,16 +92,61 @@ const platformConfigs: Record<string, IntegrationPlatform> = {
     }
 };
 
-// Dữ liệu mô phỏng cho danh sách
-const activeIntegrations = [
-    { id: "slack", status: "Connected", lastSync: "2 mins ago" },
-    { id: "google", status: "Connected", lastSync: "10 mins ago" },
-    { id: "github", status: "Connected", lastSync: "1 hour ago" },
-    { id: "jira", status: "Error", lastSync: "Failed 2 hours ago" },
-    { id: "zalo", status: "Disconnected", lastSync: "Never" },
-];
-
 export default function IntegrationsPage() {
+    return (
+        <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading integrations...</div>}>
+            <IntegrationsContent />
+        </Suspense>
+    );
+}
+
+function IntegrationsContent() {
+    const [loading, setLoading] = useState(true);
+    const [activeIntegrations, setActiveIntegrations] = useState<IntegrationData[]>([]);
+    const searchParams = useSearchParams();
+
+    // Check for OAuth callbacks
+    useEffect(() => {
+        const success = searchParams.get('success');
+        const error = searchParams.get('error');
+
+        if (success === 'slack') {
+            toast.success("Slack successfully connected!");
+            // Clean up the URL
+            window.history.replaceState({}, document.title, "/integrations");
+        }
+
+        if (error) {
+            toast.error("Failed to connect integration: " + error);
+            window.history.replaceState({}, document.title, "/integrations");
+        }
+    }, [searchParams]);
+
+    const fetchIntegrations = async () => {
+        setLoading(true);
+        try {
+            const res = await api.get('/integrations');
+            if (res.ok) {
+                const json = await res.json();
+                setActiveIntegrations(json.data || []);
+            }
+        } catch (e) {
+            console.error("Failed to fetch integrations", e);
+            toast.error("Failed to load integrations");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchIntegrations();
+    }, []);
+
+    // Helper to find the actual backend integration for a platform config
+    const getBackendIntegration = (platformId: string) => {
+        return activeIntegrations.find(i => i.provider.toLowerCase() === platformId.toLowerCase());
+    };
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -102,16 +167,17 @@ export default function IntegrationsPage() {
 
             {/* Grid Danh sách nền tảng */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {activeIntegrations.map((item) => {
-                    const config = platformConfigs[item.id]; // Lấy cấu hình chuẩn từ ID
+                {Object.values(platformConfigs).map((config) => {
+                    const backendData = getBackendIntegration(config.id);
+                    const status = backendData ? "Connected" : "Disconnected";
 
                     return (
-                        <div key={item.id} className="bg-card border border-border rounded-xl p-6 shadow-sm flex flex-col group hover:shadow-md transition-shadow">
+                        <div key={config.id} className="bg-card border border-border rounded-xl p-6 shadow-sm flex flex-col group hover:shadow-md transition-shadow">
                             <div className="flex justify-between items-start mb-4">
                                 <div className="w-14 h-14 rounded-xl bg-muted/50 border border-border flex items-center justify-center text-foreground group-hover:bg-background transition-colors">
                                     {config.icon}
                                 </div>
-                                <IntegrationStatus status={item.status as any} />
+                                <IntegrationStatus status={status as "Connected" | "Disconnected"} />
                             </div>
 
                             <div className="mb-6">
@@ -121,19 +187,18 @@ export default function IntegrationsPage() {
 
                             <div className="mt-auto border-t border-border pt-4 flex items-center justify-between">
                                 <div className="text-xs text-muted-foreground flex items-center gap-1.5">
-                                    <RefreshCw size={12} className={item.status === "Connected" ? "" : "opacity-50"} />
-                                    {item.lastSync}
+                                    <RefreshCw size={12} className={status === "Connected" ? "" : "opacity-50"} />
+                                    {status === "Connected" && backendData?.createdAt ? new Date(backendData.createdAt).toLocaleDateString() : "Never"}
                                 </div>
                                 <div className="flex gap-2">
 
-                                    {item.status === "Connected" ? (
+                                    {backendData ? (
                                         <>
-                                            {/* Truyền config tương ứng vào Modal để sửa cấu hình */}
-                                            <IntegrationSetupModal platform={config}>
+                                            <IntegrationMappingsModal integration={backendData} platform={config} onUpdate={fetchIntegrations}>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
                                                     <Settings size={16} />
                                                 </Button>
-                                            </IntegrationSetupModal>
+                                            </IntegrationMappingsModal>
 
                                             <Button variant="outline" size="sm" className="h-8 text-xs">
                                                 Sync

@@ -11,7 +11,10 @@
     "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
+    "@bull-board/api": "^8.1.0",
+    "@bull-board/express": "^8.1.0",
     "@prisma/client": "^5.14.0",
+    "@slack/web-api": "^7.18.0",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.7.8",
     "cookie-parser": "^1.4.7",

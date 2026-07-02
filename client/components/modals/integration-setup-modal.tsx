@@ -11,7 +11,9 @@ import {
     DialogTrigger,
     DialogClose,
 } from "@/components/ui/dialog";
-import { Eye, EyeOff, Lock, ExternalLink, Link2 } from "lucide-react";
+import { Eye, EyeOff, Lock, ExternalLink, Link2, Loader2 } from "lucide-react";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 export interface IntegrationField {
     id: string;
@@ -39,12 +41,48 @@ interface IntegrationSetupModalProps {
 
 export function IntegrationSetupModal({ children, platform }: IntegrationSetupModalProps) {
     const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+    const [isConnecting, setIsConnecting] = useState(false);
+    const [inviteLink, setInviteLink] = useState("");
 
     const togglePassword = (fieldId: string) => {
         setShowPasswords((prev) => ({
             ...prev,
             [fieldId]: !prev[fieldId],
         }));
+    };
+
+    const handleConnect = async () => {
+        if (platform.authType === "oauth" && platform.id === "slack") {
+            if (!inviteLink.trim()) {
+                toast.error("Please provide the Slack workspace invite link");
+                return;
+            }
+            if (!inviteLink.includes('join.slack.com')) {
+                toast.error("Please provide a valid Slack shared invite link (join.slack.com)");
+                return;
+            }
+            
+            try {
+                setIsConnecting(true);
+                const encodedLink = encodeURIComponent(inviteLink.trim());
+                const res = await api.get(`/integrations/slack/install?inviteLink=${encodedLink}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.url) {
+                        window.location.href = data.url;
+                    } else {
+                        toast.error("Invalid response from server");
+                    }
+                } else {
+                    toast.error("Failed to initiate connection");
+                }
+            } catch (err) {
+                console.error(err);
+                toast.error("An unexpected error occurred");
+            } finally {
+                setIsConnecting(false);
+            }
+        }
     };
 
     return (
@@ -137,6 +175,23 @@ export function IntegrationSetupModal({ children, platform }: IntegrationSetupMo
                                     You will be securely redirected to {platform.name} to grant ELA the necessary permissions.
                                 </p>
                             </div>
+                            
+                            {platform.id === "slack" && (
+                                <div className="w-full max-w-sm mt-4 text-left">
+                                    <label htmlFor="invite-link" className="block text-sm font-medium text-foreground mb-1">
+                                        Workspace Invite Link <span className="text-red-500">*</span>
+                                    </label>
+                                    <p className="text-[11px] leading-relaxed text-muted-foreground mb-2">Required to invite new employees to your workspace. Generate this via Slack Settings &rarr; Invite People &rarr; Share an invite link.</p>
+                                    <input
+                                        id="invite-link"
+                                        type="url"
+                                        placeholder="https://join.slack.com/t/..."
+                                        value={inviteLink}
+                                        onChange={(e) => setInviteLink(e.target.value)}
+                                        className="w-full px-3 py-2 bg-card border border-input rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                                    />
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -159,11 +214,17 @@ export function IntegrationSetupModal({ children, platform }: IntegrationSetupMo
                 {/* Footer */}
                 <DialogFooter className="m-0 p-4 px-6 border-t border-border bg-card flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
                     <DialogClose asChild>
-                        <Button variant="outline" type="button">
+                        <Button variant="outline" type="button" disabled={isConnecting}>
                             Cancel
                         </Button>
                     </DialogClose>
-                    <Button type="button" className="shadow-sm">
+                    <Button 
+                        type="button" 
+                        className="shadow-sm" 
+                        onClick={handleConnect}
+                        disabled={isConnecting}
+                    >
+                        {isConnecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         {platform.authType === "oauth" ? `Connect ${platform.name}` : "Save & Test Connection"}
                     </Button>
                 </DialogFooter>

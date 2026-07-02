@@ -17,9 +17,13 @@ export const env = {
   GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/auth/google/callback',
 
   CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:3000',
+  SERVER_URL: process.env.SERVER_URL || `http://localhost:${process.env.PORT || 5000}`,
 
   SMTP_HOST: process.env.SMTP_HOST || 'sandbox.smtp.mailtrap.io',
   SMTP_PORT: parseInt(process.env.SMTP_PORT || '2525', 10),
   SMTP_USER: process.env.SMTP_USER as string,
   SMTP_PASS: process.env.SMTP_PASS as string,
+
+  SLACK_CLIENT_ID: process.env.SLACK_CLIENT_ID as string,
+  SLACK_CLIENT_SECRET: process.env.SLACK_CLIENT_SECRET as string,
 };

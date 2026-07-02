@@ -17,6 +17,7 @@ enum JobStatus {
   PENDING
   PROCESSING
   SUCCESS
+  PARTIAL_FAILURE
   FAILED 
 }
 
@@ -110,6 +111,7 @@ model Employee {
 
   organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   jobLogs        JobLog[]
+  integrationLogs IntegrationLog[]
 }
 
 model Integration {
@@ -118,10 +120,30 @@ model Integration {
   provider       String       // e.g., "GITHUB", "SLACK"
   encryptedKey   String
   iv             String
+  authTag        String
+  metadata       Json?
   isActive       Boolean      @default(true)
   createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  mappings       IntegrationMapping[]
+
+  @@unique([organizationId, provider])
+}
+
+model IntegrationMapping {
+  id             String      @id @default(uuid())
+  integrationId  String
+  department     String      // "Engineering", "Marketing"
+  resourceId     String      // Slack channel ID "C1234567890"
+  resourceName   String      // "#engineering"
+  resourceType   String      // "channel", "team", "project"
+  createdAt      DateTime    @default(now())
+
+  integration    Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId, department, resourceId])
 }
 
 model JobLog {
@@ -133,4 +155,18 @@ model JobLog {
   createdAt  DateTime   @default(now())
 
   employee   Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model IntegrationLog {
+  id           String    @id @default(uuid())
+  employeeId   String
+  provider     String
+  action       String    // "ONBOARD", "OFFBOARD"
+  status       JobStatus @default(PENDING)
+  message      String?
+  retryCount   Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  employee     Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }

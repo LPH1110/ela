@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
 export class EmailService {
   static async sendInvitation(email: string, orgName: string, inviteToken: string) {
     const inviteLink = `${env.CLIENT_URL}/login?inviteToken=${inviteToken}`;
-    
+
     const mailOptions = {
       from: '"ELA Platform" <noreply@ela-platform.com>',
       to: email,
@@ -40,9 +40,24 @@ export class EmailService {
       throw new Error('Failed to send email');
     }
   }
-  static async sendOnboardingWelcome(email: string, fullName: string, orgName: string) {
+  static async sendOnboardingWelcome(email: string, fullName: string, orgName: string, slackInviteLink?: string) {
     const loginLink = `${env.CLIENT_URL}/login`;
     
+    let slackHtml = '';
+    if (slackInviteLink) {
+      slackHtml = `
+          <div style="margin: 24px 0; padding: 20px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <h3 style="margin-top: 0; color: #0f172a;">📱 Action Required: Join Slack</h3>
+            <p style="color: #475569; margin-bottom: 16px;">
+              To automatically be added to your team's communication channels, you must join our Slack workspace using your new company email.
+            </p>
+            <a href="${slackInviteLink}" style="display: inline-block; padding: 10px 20px; background-color: #4a154b; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 500;">
+              Join Company Slack
+            </a>
+          </div>
+      `;
+    }
+
     const mailOptions = {
       from: '"ELA Platform" <noreply@ela-platform.com>',
       to: email,
@@ -51,10 +66,13 @@ export class EmailService {
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
           <h2>Welcome to the team, ${fullName}!</h2>
           <p>We are excited to have you join <strong>${orgName}</strong>.</p>
-          <p>Your IT onboarding sequence has completed successfully. Your accounts for our internal tools (like Google Workspace, Slack, Jira, etc.) have been provisioned.</p>
+          <p>Your IT onboarding sequence has completed successfully. Your accounts for our internal tools have been provisioned.</p>
+          
+          ${slackHtml}
+
           <p>Please check your personal email or talk to your manager for your temporary passwords.</p>
           <p>If you have been granted access to the ELA platform itself, you can log in below:</p>
-          <a href="${loginLink}" style="display: inline-block; padding: 10px 20px; margin: 20px 0; background-color: #10b981; color: #fff; text-decoration: none; border-radius: 5px;">
+          <a href="${loginLink}" style="display: inline-block; padding: 10px 20px; margin: 10px 0 20px; background-color: #0f172a; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 500;">
             Log In to ELA
           </a>
         </div>
