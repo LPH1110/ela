@@ -21,6 +21,6 @@ echo "Deploying Prisma migrations..."
 cd server
 npx prisma migrate dev --name init_db --create-only
 npx --no-install prisma migrate deploy
-
+rm -rf prisma/migrations
 
 echo "Infrastructure rebuilt successfully!"
