@@ -10,6 +10,7 @@ router.use(authenticate);
 
 router.get('/', IntegrationController.listIntegrations);
 router.delete('/:id', requireRole('OWNER'), IntegrationController.disconnectIntegration);
+router.post('/:id/sync', requireRole('OWNER', 'ADMIN'), IntegrationController.syncIntegration);
 
 router.get('/slack/install', requireRole('OWNER'), IntegrationController.slackInstall);
 

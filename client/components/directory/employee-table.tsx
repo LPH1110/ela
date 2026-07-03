@@ -258,8 +258,6 @@ export default function EmployeeTable({ initialEmployees, onRefresh }: EmployeeT
         </div>
     );
 }
-
-// Component phụ để render Badge Status với màu sắc chuẩn theo thiết kế
 function StatusBadge({ status }: { status: Employee["status"] }) {
     if (status === "Active") {
         return (

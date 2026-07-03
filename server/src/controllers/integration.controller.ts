@@ -65,6 +65,67 @@ export class IntegrationController {
     return res.status(200).json({ message: 'Integration disconnected successfully' });
   });
 
+  static syncIntegration = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const organizationId = req.user?.orgId;
+
+    if (!organizationId) {
+      throw new AppError(403, ErrorCodes.FORBIDDEN_NO_ORG, 'Forbidden: No organization context');
+    }
+
+    const integration = await prisma.integration.findUnique({
+      where: { id, organizationId }
+    });
+
+    if (!integration) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Integration not found');
+    }
+
+    // Fetch all active employees
+    const employees = await prisma.employee.findMany({
+      where: { 
+        organizationId,
+        status: 'ACTIVE'
+      }
+    });
+
+    let count = 0;
+    for (let i = 0; i < employees.length; i++) {
+      const employee = employees[i];
+      
+      // Log that a sync is happening
+      const syncJobLog = await prisma.jobLog.create({
+        data: {
+          employeeId: employee.id,
+          action: 'IT_ONBOARDING',
+          status: 'PROCESSING',
+          message: `Manual sync triggered for ${integration.provider}`
+        }
+      });
+
+      // Stagger the jobs to avoid hitting rate limits
+      await deferredIntegrationQueue.add('deferred-integration', {
+        employeeId: employee.id,
+        organizationId,
+        provider: integration.provider,
+        jobLogId: syncJobLog.id
+      }, {
+        delay: i * 2000, // 2 seconds apart
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 5000
+        }
+      });
+      count++;
+    }
+
+    return res.status(200).json({ 
+      message: `Sync started for ${count} active employees`,
+      data: { count }
+    });
+  });
+
   static getProviderResources = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const organizationId = req.user?.orgId;

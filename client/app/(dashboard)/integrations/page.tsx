@@ -15,7 +15,8 @@ import {
     Settings,
     RefreshCw,
     CheckCircle2,
-    AlertCircle
+    AlertCircle,
+    ExternalLink
 } from "lucide-react";
 import { IntegrationSetupModal, IntegrationPlatform } from "@/components/modals/integration-setup-modal";
 import { IntegrationMappingsModal } from "@/components/modals/integration-mappings-modal";
@@ -114,6 +115,7 @@ export default function IntegrationsPage() {
 function IntegrationsContent() {
     const [loading, setLoading] = useState(true);
     const [activeIntegrations, setActiveIntegrations] = useState<IntegrationData[]>([]);
+    const [isSyncing, setIsSyncing] = useState<string | null>(null);
     const searchParams = useSearchParams();
 
     // Check for OAuth callbacks
@@ -169,6 +171,25 @@ function IntegrationsContent() {
         }
     };
 
+    const handleSync = async (id: string) => {
+        setIsSyncing(id);
+        try {
+            const res = await api.post(`/integrations/${id}/sync`);
+            if (res.ok) {
+                const data = await res.json();
+                toast.success(data.message || "Sync started successfully");
+            } else {
+                const data = await res.json().catch(() => ({}));
+                toast.error(data.error?.message || "Failed to start sync");
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("An unexpected error occurred");
+        } finally {
+            setIsSyncing(null);
+        }
+    };
+
     // Helper to find the actual backend integration for a platform config
     const getBackendIntegration = (platformId: string) => {
         return activeIntegrations.find(i => i.provider.toLowerCase() === platformId.toLowerCase());
@@ -209,7 +230,26 @@ function IntegrationsContent() {
 
                             <div className="mb-6">
                                 <h3 className="text-lg font-semibold text-foreground">{config.name}</h3>
-                                <p className="text-sm text-muted-foreground line-clamp-2">{config.description}</p>
+                                {backendData?.metadata?.teamName ? (
+                                    <div className="mt-1 flex flex-col gap-1">
+                                        <p className="text-sm text-muted-foreground line-clamp-1">{config.description}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-[13px] font-medium text-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 px-2.5 py-0.5 rounded-md border border-emerald-200/50 dark:border-emerald-900/50 inline-flex items-center gap-1.5">
+                                                Workspace: 
+                                                {backendData.metadata.teamUrl ? (
+                                                    <a href={backendData.metadata.teamUrl as string} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1">
+                                                        {backendData.metadata.teamName as string}
+                                                        <ExternalLink size={12} className="opacity-70" />
+                                                    </a>
+                                                ) : (
+                                                    backendData.metadata.teamName as string
+                                                )}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{config.description}</p>
+                                )}
                             </div>
 
                             <div className="mt-auto border-t border-border pt-4 flex items-center justify-between">
@@ -229,7 +269,36 @@ function IntegrationsContent() {
 
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
-                                                    <Button variant="outline" size="sm" className="h-8 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground">
+                                                    <Button variant="outline" size="sm" className="h-8 text-xs" disabled={isSyncing === backendData.id}>
+                                                        {isSyncing === backendData.id ? (
+                                                            <RefreshCw size={14} className="mr-1 animate-spin" />
+                                                        ) : (
+                                                            <RefreshCw size={14} className="mr-1" />
+                                                        )}
+                                                        Sync
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent className="sm:max-w-[425px]">
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Sync {config.name}?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            This will manually attempt to invite all existing active employees to the mapped channels in this workspace. This happens in the background. Are you sure you want to proceed?
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction
+                                                            onClick={() => handleSync(backendData.id)}
+                                                        >
+                                                            Start Sync
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="outline" size="sm" className="h-8 text-xs text-destructive hover:bg-destructive hover:text-background">
                                                         Disconnect
                                                     </Button>
                                                 </AlertDialogTrigger>

@@ -44,6 +44,7 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
     const { id } = use(params);
     const router = useRouter();
     const [employee, setEmployee] = useState<Employee | null>(null);
+    const [integrations, setIntegrations] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     const fetchEmployee = async () => {
@@ -57,13 +58,29 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
             setEmployee(json.data);
         } catch (e) {
             console.error(e);
-        } finally {
-            setLoading(false);
         }
     };
 
+    const fetchIntegrations = async () => {
+        try {
+            const res = await api.get('/integrations');
+            if (res.ok) {
+                const json = await res.json();
+                setIntegrations(json.data || []);
+            }
+        } catch (e) {
+            console.error("Failed to fetch integrations", e);
+        }
+    };
+
+    const loadData = async () => {
+        setLoading(true);
+        await Promise.all([fetchEmployee(), fetchIntegrations()]);
+        setLoading(false);
+    };
+
     useEffect(() => {
-        fetchEmployee();
+        loadData();
     }, [id, router]);
 
     if (loading) {
@@ -219,27 +236,59 @@ export default function EmployeeProfilePage({ params }: { params: Promise<{ id: 
                             <button className="text-xs font-medium text-primary hover:underline cursor-pointer">Manage Access</button>
                         </div>
                         <div className="divide-y divide-border/50">
-                            {[
-                                { name: "Slack", handle: "@" + employee.fullName.split(" ")[0].toLowerCase(), icon: MessageSquare, status: "Active", bg: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" },
-                                { name: "GitHub", handle: employee.fullName.split(" ")[0].toLowerCase() + "-dev", icon: Code, status: "Active", bg: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" },
-                                { name: "Jira Service Management", handle: employee.fullName, icon: CheckSquare, status: employee.status === "ONBOARDING" ? "Provisioning" : "Active", bg: employee.status === "ONBOARDING" ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400" : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" },
-                                { name: "Google Workspace", handle: employee.companyEmail || employee.personalEmail, icon: Mail, status: "Active", bg: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" }
-                            ].map((app) => (
-                                <div key={app.name} className="px-6 py-4 flex items-center justify-between hover:bg-muted/30 transition-colors group">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center border border-border/50 group-hover:border-primary group-hover:text-primary transition-colors text-muted-foreground">
-                                            <app.icon size={20} />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-semibold text-foreground">{app.name}</p>
-                                            <p className="text-xs font-medium text-muted-foreground">{app.handle}</p>
-                                        </div>
-                                    </div>
-                                    <span className={`px-2 py-1 text-[11px] font-bold uppercase rounded-md ${isOffboarded ? 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' : app.bg}`}>
-                                        {isOffboarded ? 'Revoked' : app.status}
-                                    </span>
+                            {integrations.length === 0 ? (
+                                <div className="px-6 py-8 text-center text-sm text-muted-foreground">
+                                    No integrations connected yet.
                                 </div>
-                            ))}
+                            ) : (
+                                integrations.map((integration) => {
+                                    // Map provider to specific UI details
+                                    let Icon = Network;
+                                    let name = integration.provider;
+                                    let handle = employee.companyEmail || employee.personalEmail;
+                                    
+                                    if (integration.provider === "SLACK") {
+                                        Icon = MessageSquare;
+                                        name = "Slack";
+                                        handle = "@" + employee.fullName.split(" ")[0].toLowerCase();
+                                    } else if (integration.provider === "GITHUB") {
+                                        Icon = Code;
+                                        name = "GitHub";
+                                        handle = employee.fullName.split(" ")[0].toLowerCase() + "-dev";
+                                    }
+                                    
+                                    let statusText = "Active";
+                                    let bgClass = "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400";
+                                    
+                                    if (isOffboarded) {
+                                        statusText = "Revoked";
+                                        bgClass = "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400";
+                                    } else if (employee.status === "ONBOARDING") {
+                                        statusText = "Provisioning";
+                                        bgClass = "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400";
+                                    } else if (integration.metadata?.teamName) {
+                                        // Include team name context for active employees
+                                        statusText = `Active in ${integration.metadata.teamName}`;
+                                    }
+
+                                    return (
+                                        <div key={integration.id} className="px-6 py-4 flex items-center justify-between hover:bg-muted/30 transition-colors group">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center border border-border/50 group-hover:border-primary group-hover:text-primary transition-colors text-muted-foreground">
+                                                    <Icon size={20} />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-foreground">{name}</p>
+                                                    <p className="text-xs font-medium text-muted-foreground">{handle}</p>
+                                                </div>
+                                            </div>
+                                            <span className={`px-2 py-1 text-[11px] font-bold uppercase rounded-md ${bgClass}`}>
+                                                {statusText}
+                                            </span>
+                                        </div>
+                                    );
+                                })
+                            )}
                         </div>
                     </section>
 
