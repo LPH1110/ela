@@ -44,6 +44,8 @@ export default function OnboardingModal({ children, onSuccess }: OnboardingModal
     const [submitError, setSubmitError] = useState<string | null>(null);
     const router = useRouter();
 
+    const [departmentsList, setDepartmentsList] = useState<string[]>([]);
+
     const {
         register,
         handleSubmit,
@@ -59,6 +61,24 @@ export default function OnboardingModal({ children, onSuccess }: OnboardingModal
             startDate: "",
         },
     });
+
+    useEffect(() => {
+        const fetchDepartments = async () => {
+            try {
+                const res = await api.get('/orgs/departments');
+                if (res.ok) {
+                    const json = await res.json();
+                    setDepartmentsList(json.data || ["Engineering", "Product", "Sales", "Marketing", "HR"]);
+                }
+            } catch (e) {
+                console.error("Failed to fetch departments", e);
+                setDepartmentsList(["Engineering", "Product", "Sales", "Marketing", "HR"]);
+            }
+        };
+        if (open) {
+            fetchDepartments();
+        }
+    }, [open]);
 
     // Manually register custom inputs
     useEffect(() => {
@@ -206,7 +226,7 @@ export default function OnboardingModal({ children, onSuccess }: OnboardingModal
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
-                                        {["Engineering", "Product", "Sales", "Marketing", "HR"].map((dept) => (
+                                        {departmentsList.map((dept) => (
                                             <DropdownMenuItem
                                                 key={dept}
                                                 onSelect={() => setValue("department", dept, { shouldValidate: true })}

@@ -47,62 +47,7 @@ interface IntegrationData {
     }>;
 }
 
-// --- KHAI BÁO CẤU HÌNH CHO TỪNG NỀN TẢNG ---
-const platformConfigs: Record<string, IntegrationPlatform> = {
-    github: {
-        id: "github",
-        name: "GitHub",
-        icon: <Cat size={24} />,
-        description: "Connect GitHub to automate organization invites and manage repository access.",
-        authType: "credentials",
-        docsUrl: "#github-docs",
-        scopes: ["repo", "admin:org", "user"],
-        fields: [
-            { id: "pat", label: "Personal Access Token (PAT)", type: "password", placeholder: "ghp_xxxxxxxxxxxxxxxxxxxx" }
-        ]
-    },
-    slack: {
-        id: "slack",
-        name: "Slack Enterprise",
-        icon: <MessageSquare size={24} />,
-        description: "Integrate Slack to provision accounts and send onboarding welcome messages.",
-        authType: "oauth", // Slack thường dùng OAuth 1-click
-        docsUrl: "#slack-docs"
-    },
-    google: {
-        id: "google",
-        name: "Google Workspace",
-        icon: <Briefcase size={24} />,
-        description: "Automate Gmail, Google Drive, and organizational unit (OU) assignments.",
-        authType: "oauth", // Google Workspace thường dùng OAuth Domain-Wide Delegation
-        docsUrl: "#google-docs"
-    },
-    jira: {
-        id: "jira",
-        name: "Jira Software",
-        icon: <CheckSquare size={24} />,
-        description: "Manage Jira project access and issue assignment upon onboarding.",
-        authType: "credentials",
-        docsUrl: "#jira-docs",
-        fields: [
-            { id: "domain", label: "Workspace URL", type: "url", placeholder: "https://your-company.atlassian.net" },
-            { id: "email", label: "Admin Email", type: "text", placeholder: "admin@your-company.com" },
-            { id: "api_token", label: "Jira API Token", type: "password", placeholder: "ATATT3xFfGF0..." }
-        ]
-    },
-    zalo: {
-        id: "zalo",
-        name: "Zalo Official Account",
-        icon: <MessageCircle size={24} />, // Lucide không có Zalo, dùng tạm MessageCircle
-        description: "Connect Zalo ZNS to send automated notifications to employees via Zalo.",
-        authType: "credentials",
-        docsUrl: "#zalo-docs",
-        fields: [
-            { id: "oa_id", label: "Official Account ID", type: "text", placeholder: "1234567890" },
-            { id: "access_token", label: "Zalo Access Token", type: "password", placeholder: "eyJhbGciOiJIUzI1NiIs..." }
-        ]
-    }
-};
+// platformConfigs will be fetched from the backend dynamically
 
 export default function IntegrationsPage() {
     return (
@@ -115,8 +60,20 @@ export default function IntegrationsPage() {
 function IntegrationsContent() {
     const [loading, setLoading] = useState(true);
     const [activeIntegrations, setActiveIntegrations] = useState<IntegrationData[]>([]);
+    const [catalog, setCatalog] = useState<Record<string, IntegrationPlatform>>({});
     const [isSyncing, setIsSyncing] = useState<string | null>(null);
     const searchParams = useSearchParams();
+
+    const getProviderIcon = (provider: string) => {
+        switch (provider.toLowerCase()) {
+            case 'github': return <Cat size={24} />;
+            case 'slack': return <MessageSquare size={24} />;
+            case 'google': return <Briefcase size={24} />;
+            case 'jira': return <CheckSquare size={24} />;
+            case 'zalo': return <MessageCircle size={24} />;
+            default: return <MessageSquare size={24} />;
+        }
+    };
 
     // Check for OAuth callbacks
     useEffect(() => {
@@ -138,10 +95,29 @@ function IntegrationsContent() {
     const fetchIntegrations = async () => {
         setLoading(true);
         try {
-            const res = await api.get('/integrations');
-            if (res.ok) {
-                const json = await res.json();
+            const [integrationsRes, catalogRes] = await Promise.all([
+                api.get('/integrations'),
+                api.get('/integrations/catalog')
+            ]);
+            
+            if (integrationsRes.ok) {
+                const json = await integrationsRes.json();
                 setActiveIntegrations(json.data || []);
+            }
+
+            if (catalogRes.ok) {
+                const catalogJson = await catalogRes.json();
+                const catalogData = catalogJson.data || {};
+                
+                // Map backend catalog to frontend format with icons
+                const mappedCatalog: Record<string, IntegrationPlatform> = {};
+                for (const key in catalogData) {
+                    mappedCatalog[key] = {
+                        ...catalogData[key],
+                        icon: getProviderIcon(key)
+                    };
+                }
+                setCatalog(mappedCatalog);
             }
         } catch (e) {
             console.error("Failed to fetch integrations", e);
@@ -215,7 +191,7 @@ function IntegrationsContent() {
 
             {/* Grid Danh sách nền tảng */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {Object.values(platformConfigs).map((config) => {
+                {Object.values(catalog).map((config) => {
                     const backendData = getBackendIntegration(config.id);
                     const status = backendData ? "Connected" : "Disconnected";
 

@@ -1,12 +1,46 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { OnboardingModal } from "@/components/modals";
 import { Button } from "@/components/ui/button";
 import { Users, UserPlus, UserMinus, Network, Plus, RefreshCw } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { api } from "@/lib/api";
+import { formatDistanceToNow } from "date-fns";
 
 export default function Home() {
   const { user } = useAuth();
+  const [metrics, setMetrics] = useState({
+    totalEmployees: 0,
+    pendingOnboarding: 0,
+    recentOffboards: 0,
+    activeIntegrations: 0
+  });
+  const [logs, setLogs] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const [metricsRes, logsRes] = await Promise.all([
+          api.get('/orgs/metrics'),
+          api.get('/orgs/audit-logs?limit=4')
+        ]);
+
+        if (metricsRes.ok) {
+          const metricsData = await metricsRes.json();
+          setMetrics(metricsData.data);
+        }
+        if (logsRes.ok) {
+          const logsData = await logsRes.json();
+          setLogs(logsData.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch dashboard data", error);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
 
   return (
     <div className="flex flex-col gap-6">
@@ -19,10 +53,10 @@ export default function Home() {
 
       {/* Bento Grid - Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-        <MetricCard title="Total Employees" value="1,248" subValue="+12 this month" subValueColor="text-primary" icon={<Users size={20} />} />
-        <MetricCard title="Pending Onboarding" value="12" subValue="3 require attention" subValueColor="text-muted-foreground" icon={<UserPlus size={20} />} />
-        <MetricCard title="Recent Offboards" value="5" subValue="In last 30 days" subValueColor="text-muted-foreground" icon={<UserMinus size={20} />} />
-        <MetricCard title="Active Integrations" value="18" subValue="All systems operational" subValueColor="text-muted-foreground" icon={<Network size={20} />} />
+        <MetricCard title="Total Employees" value={metrics.totalEmployees} subValue="Active in system" subValueColor="text-primary" icon={<Users size={20} />} />
+        <MetricCard title="Pending Onboarding" value={metrics.pendingOnboarding} subValue="Require attention" subValueColor="text-muted-foreground" icon={<UserPlus size={20} />} />
+        <MetricCard title="Recent Offboards" value={metrics.recentOffboards} subValue="In last 30 days" subValueColor="text-muted-foreground" icon={<UserMinus size={20} />} />
+        <MetricCard title="Active Integrations" value={metrics.activeIntegrations} subValue="Systems operational" subValueColor="text-muted-foreground" icon={<Network size={20} />} />
       </div>
 
       {/* Asymmetric Layout */}
@@ -36,10 +70,37 @@ export default function Home() {
           <div className="p-5 flex-1">
             {/* Vertical Timeline */}
             <div className="relative pl-6 border-l border-border ml-2 space-y-6">
-              <TimelineItem time="10:42 AM" user="John Doe" action="GitHub access revoked for" status="Access removal confirmed" statusColor="text-destructive" dotColor="bg-destructive" />
-              <TimelineItem time="09:15 AM" user="Jane Smith" action="Slack account provisioned for" status="Provisioning successful" statusColor="text-emerald-500" dotColor="bg-emerald-500" />
-              <TimelineItem time="Yesterday, 4:30 PM" user="Alex Johnson" action="Google Workspace account created for" status="Provisioning successful" statusColor="text-emerald-500" dotColor="bg-emerald-500" />
-              <TimelineItem time="Yesterday, 2:00 PM" user="" action="System sync initiated across all integrations." status="Routine maintenance" statusColor="text-muted-foreground" dotColor="bg-muted-foreground" />
+              {logs.length > 0 ? logs.map(log => {
+                let statusColor = "text-muted-foreground";
+                let dotColor = "bg-muted-foreground";
+                
+                if (log.status === "SUCCESS") {
+                  statusColor = "text-emerald-500";
+                  dotColor = "bg-emerald-500";
+                } else if (log.status === "FAILED") {
+                  statusColor = "text-destructive";
+                  dotColor = "bg-destructive";
+                } else if (log.status === "PROCESSING") {
+                  statusColor = "text-blue-500";
+                  dotColor = "bg-blue-500";
+                }
+                
+                const timeStr = formatDistanceToNow(new Date(log.createdAt), { addSuffix: true });
+                
+                return (
+                  <TimelineItem 
+                    key={log.id}
+                    time={timeStr} 
+                    user={log.employee?.fullName} 
+                    action={`${log.action} on ${log.provider} for`} 
+                    status={log.status} 
+                    statusColor={statusColor} 
+                    dotColor={dotColor} 
+                  />
+                );
+              }) : (
+                <div className="text-sm text-muted-foreground">No recent activity</div>
+              )}
             </div>
           </div>
         </div>

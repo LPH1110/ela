@@ -8,6 +8,7 @@ router.get('/slack/callback', IntegrationController.slackCallback);
 
 router.use(authenticate);
 
+router.get('/catalog', IntegrationController.getCatalog);
 router.get('/', IntegrationController.listIntegrations);
 router.delete('/:id', requireRole('OWNER'), IntegrationController.disconnectIntegration);
 router.post('/:id/sync', requireRole('OWNER', 'ADMIN'), IntegrationController.syncIntegration);

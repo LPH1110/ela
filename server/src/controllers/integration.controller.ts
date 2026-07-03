@@ -10,6 +10,62 @@ import { deferredIntegrationQueue } from '../queues/deferred-integration.queue';
 
 export class IntegrationController {
   
+  static getCatalog = asyncHandler(async (req: Request, res: Response) => {
+    // Return the integration catalog
+    const catalog = {
+      github: {
+        id: "github",
+        name: "GitHub",
+        description: "Connect GitHub to automate organization invites and manage repository access.",
+        authType: "credentials",
+        docsUrl: "#github-docs",
+        scopes: ["repo", "admin:org", "user"],
+        fields: [
+          { id: "pat", label: "Personal Access Token (PAT)", type: "password", placeholder: "ghp_xxxxxxxxxxxxxxxxxxxx" }
+        ]
+      },
+      slack: {
+        id: "slack",
+        name: "Slack Enterprise",
+        description: "Integrate Slack to provision accounts and send onboarding welcome messages.",
+        authType: "oauth",
+        docsUrl: "#slack-docs"
+      },
+      google: {
+        id: "google",
+        name: "Google Workspace",
+        description: "Automate Gmail, Google Drive, and organizational unit (OU) assignments.",
+        authType: "oauth",
+        docsUrl: "#google-docs"
+      },
+      jira: {
+        id: "jira",
+        name: "Jira Software",
+        description: "Manage Jira project access and issue assignment upon onboarding.",
+        authType: "credentials",
+        docsUrl: "#jira-docs",
+        fields: [
+          { id: "domain", label: "Workspace URL", type: "url", placeholder: "https://your-company.atlassian.net" },
+          { id: "email", label: "Admin Email", type: "text", placeholder: "admin@your-company.com" },
+          { id: "api_token", label: "Jira API Token", type: "password", placeholder: "ATATT3xFfGF0..." }
+        ]
+      },
+      zalo: {
+        id: "zalo",
+        name: "Zalo Official Account",
+        description: "Connect Zalo ZNS to send automated notifications to employees via Zalo.",
+        authType: "credentials",
+        docsUrl: "#zalo-docs",
+        fields: [
+          { id: "oa_id", label: "Official Account ID", type: "text", placeholder: "1234567890" },
+          { id: "access_token", label: "Zalo Access Token", type: "password", placeholder: "eyJhbGciOiJIUzI1NiIs..." }
+        ]
+      }
+    };
+
+    return res.status(200).json({ data: catalog });
+  });
+
   static listIntegrations = asyncHandler(async (req: Request, res: Response) => {
     const organizationId = req.user?.orgId;
     if (!organizationId) {

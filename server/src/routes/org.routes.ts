@@ -13,4 +13,13 @@ router.post('/:orgId/invite', authenticate, requireOrg, requireRole('OWNER', 'AD
 // List members
 router.get('/:orgId/members', authenticate, requireOrg, OrgController.listMembers);
 
+// Dashboard metrics
+router.get('/metrics', authenticate, requireOrg, OrgController.getMetrics);
+
+// Departments catalog
+router.get('/departments', authenticate, requireOrg, OrgController.getDepartments);
+
+// Audit logs
+router.get('/audit-logs', authenticate, requireOrg, OrgController.getAuditLogs);
+
 export default router;

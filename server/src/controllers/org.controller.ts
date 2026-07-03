@@ -92,4 +92,61 @@ export class OrgController {
 
     return res.status(200).json({ data: members });
   });
+
+  static getMetrics = asyncHandler(async (req: Request, res: Response) => {
+    const orgId = req.user!.orgId!;
+    
+    const [totalEmployees, pendingOnboarding, activeIntegrations, recentOffboards] = await Promise.all([
+      prisma.employee.count({ where: { organizationId: orgId } }),
+      prisma.employee.count({ where: { organizationId: orgId, status: 'ONBOARDING' } }),
+      prisma.integration.count({ where: { organizationId: orgId, isActive: true } }),
+      prisma.employee.count({
+        where: {
+          organizationId: orgId,
+          status: 'OFFBOARDED',
+          updatedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+        }
+      })
+    ]);
+
+    return res.status(200).json({
+      data: {
+        totalEmployees,
+        pendingOnboarding,
+        activeIntegrations,
+        recentOffboards
+      }
+    });
+  });
+
+  static getDepartments = asyncHandler(async (req: Request, res: Response) => {
+    const departments = [
+      "Engineering",
+      "Product",
+      "Design",
+      "Marketing",
+      "Sales",
+      "HR",
+      "Finance",
+      "Operations"
+    ];
+    
+    return res.status(200).json({ data: departments });
+  });
+
+  static getAuditLogs = asyncHandler(async (req: Request, res: Response) => {
+    const orgId = req.user!.orgId!;
+    const limit = parseInt(req.query.limit as string) || 50;
+
+    const logs = await prisma.integrationLog.findMany({
+      where: { employee: { organizationId: orgId } },
+      include: {
+        employee: { select: { id: true, fullName: true, personalEmail: true, companyEmail: true } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit
+    });
+
+    return res.status(200).json({ data: logs });
+  });
 }

@@ -44,22 +44,13 @@ interface IntegrationMappingsModalProps {
     onUpdate: () => void;
 }
 
-const DEPARTMENTS = [
-    "Engineering",
-    "Product",
-    "Design",
-    "Marketing",
-    "Sales",
-    "HR",
-    "Finance",
-    "Operations"
-];
 
 export function IntegrationMappingsModal({ children, integration, platform, onUpdate }: IntegrationMappingsModalProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isLoadingResources, setIsLoadingResources] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [resources, setResources] = useState<{ id: string; name: string; type: string }[]>([]);
+    const [departmentsList, setDepartmentsList] = useState<string[]>([]);
 
     // Form state
     const [selectedDepartment, setSelectedDepartment] = useState("");
@@ -83,13 +74,26 @@ export function IntegrationMappingsModal({ children, integration, platform, onUp
         }
     }, [integration.id, platform.name]);
 
+    const fetchDepartments = useCallback(async () => {
+        try {
+            const res = await api.get('/orgs/departments');
+            if (res.ok) {
+                const json = await res.json();
+                setDepartmentsList(json.data || []);
+            }
+        } catch (e) {
+            console.error("Failed to fetch departments", e);
+        }
+    }, []);
+
     // Fetch resources when modal opens
     useEffect(() => {
         if (isOpen && integration) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
             fetchResources();
+            fetchDepartments();
         }
-    }, [isOpen, integration, fetchResources]);
+    }, [isOpen, integration, fetchResources, fetchDepartments]);
 
     const handleAddMapping = async () => {
         if (!selectedDepartment || !selectedResource) return;
@@ -195,7 +199,7 @@ export function IntegrationMappingsModal({ children, integration, platform, onUp
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent>
-                                            {DEPARTMENTS.map(dept => (
+                                            {departmentsList.map(dept => (
                                                 <DropdownMenuItem key={dept} onSelect={() => setSelectedDepartment(dept)}>
                                                     {dept}
                                                 </DropdownMenuItem>

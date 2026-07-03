@@ -15,55 +15,63 @@ import {
     RefreshCw,
     Search
 } from "lucide-react";
-import { Fragment, useState } from "react";
-
-// Định nghĩa dữ liệu mẫu dựa trên HTML
-const auditLogs = [
-    {
-        id: "log-001",
-        timestamp: "2023-10-17 09:41:22",
-        employee: { name: "Sarah Jenkins", email: "s.jenkins@kinetic.io", avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuDeqPnR6V6S0TEec22HZ5Q8SlcTs09bCKwaTSci5Q7pc00DkcvEUrSheSWz19L4Nfg7jKNvsPMr7_6P9PAxcUXEg_l6PPiw_y0mcVmGxwaG8BdQIM9T18PbRjdnEQr8gPWSL9u0Vq4shJic4XfnJO-uRZCmLSgO9vN6OWbnc9Z358aY3r1ql6T5xIH7QH-3bRLeKtWy9cRmn9iCGd9Q__ChzDwtnxnuuJwEPAOK8wuj0OuMwDqq2ze5V80t19uYlRKvKaB__Zw9BQdx" },
-        app: { name: "Cat", icon: <Cat size={16} /> },
-        action: "CREATE_ACCOUNT",
-        status: "Success",
-    },
-    {
-        id: "err-124",
-        timestamp: "2023-10-17 09:38:05",
-        employee: { name: "Marcus Chen", email: "m.chen@kinetic.io", avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuDcDH2t2vmqUsE4B4wyygC7Vi-RgdDfohqZDF4XD9OJYTKGl9MRCkwzeHeevUtr8ScqV-LSe498BpCMlN1hrhopMG22uqTJ9Y3NY8CIeKfP47qzMim7xg2RttJsXps8fAkKcHMuL3GaiqhdAhKXH_hL5esiUYF9FhabFPJBWmWE-mFMmHJYKueCvaRODx9nfGuH-Hnu3DJq6AGUFG8NB9aUixQla5KF0NQ8ga3gJyEA7wvorMTHaVJxoDWMTI6Y3Cz9GvpMEANpssXv" },
-        app: { name: "Slack", icon: <MessageSquare size={16} /> },
-        action: "REVOKE_ACCESS",
-        status: "Failed",
-        errorPayload: `{
-  "timestamp": "2023-10-17T13:38:05.124Z",
-  "action": "REVOKE_ACCESS",
-  "target_system": "slack_enterprise",
-  "user_id": "usr_9982a1b",
-  "error": {
-    "code": "API_RATE_LIMIT_EXCEEDED",
-    "message": "Slack API rejected the request due to rate limiting on the admin.users.remove endpoint.",
-    "retry_after": 120
-  },
-  "correlation_id": "req_55b3-9092-11a2"
-}`,
-    },
-    {
-        id: "log-003",
-        timestamp: "2023-10-17 09:35:11",
-        employee: { name: "Elena Jenkins", email: "e.jenkins@kinetic.io", initials: "EJ" },
-        app: { name: "AWS IAM", icon: <Cloud size={16} /> },
-        action: "UPDATE_POLICIES",
-        status: "Processing",
-    },
-];
+import { useEffect, useState, Fragment } from "react";
+import { api } from "@/lib/api";
+import { format } from "date-fns";
+import { Briefcase, CheckSquare, MessageCircle } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DateRangePicker, DateRange } from "@/components/ui/date-range-picker";
 
 export default function AuditLogsPage() {
     const [expandedRows, setExpandedRows] = useState<string[]>([]);
+    const [logs, setLogs] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [statusFilter, setStatusFilter] = useState("all");
+    const [dateRange, setDateRange] = useState<DateRange>({});
 
     const toggleRow = (id: string) => {
         setExpandedRows((prev) =>
             prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id]
         );
+    };
+
+    useEffect(() => {
+        const fetchLogs = async () => {
+            try {
+                const response = await api.get('/orgs/audit-logs?limit=100');
+                if (response.ok) {
+                    const data = await response.json();
+                    setLogs(data.data || []);
+                }
+            } catch (error) {
+                console.error("Failed to load audit logs", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchLogs();
+    }, []);
+
+    const getProviderIcon = (provider: string) => {
+        switch (provider.toUpperCase()) {
+            case 'GITHUB': return <Cat size={16} />;
+            case 'SLACK': return <MessageSquare size={16} />;
+            case 'GOOGLE': return <Briefcase size={16} />;
+            case 'JIRA': return <CheckSquare size={16} />;
+            case 'ZALO': return <MessageCircle size={16} />;
+            default: return <Cloud size={16} />;
+        }
+    };
+
+    const getProviderName = (provider: string) => {
+        switch (provider.toUpperCase()) {
+            case 'GITHUB': return "GitHub";
+            case 'SLACK': return "Slack";
+            case 'GOOGLE': return "Google Workspace";
+            case 'JIRA': return "Jira";
+            case 'ZALO': return "Zalo";
+            default: return provider;
+        }
     };
 
     return (
@@ -90,19 +98,26 @@ export default function AuditLogsPage() {
                     />
                 </div>
                 <div className="relative min-w-[160px]">
-                    <select className="w-full px-3 py-2 bg-background border border-input rounded-md text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer">
-                        <option value="all">All Statuses</option>
-                        <option value="success">Success</option>
-                        <option value="failed">Failed</option>
-                        <option value="processing">Processing</option>
-                    </select>
+                    <DropdownMenu modal={false}>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full justify-between bg-background border-input font-normal h-[38px] px-3">
+                                <span className="capitalize">{statusFilter === 'all' ? 'All Statuses' : statusFilter}</span>
+                                <ChevronDown size={16} className="opacity-50" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
+                            <DropdownMenuItem onSelect={() => setStatusFilter("all")}>All Statuses</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setStatusFilter("success")}>Success</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setStatusFilter("failed")}>Failed</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setStatusFilter("processing")}>Processing</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
-                <div className="relative min-w-[200px]">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
-                    <input
-                        className="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
-                        defaultValue="Oct 10 - Oct 17, 2023"
-                        readOnly
+                <div className="relative min-w-[240px]">
+                    <DateRangePicker 
+                        value={dateRange} 
+                        onChange={setDateRange} 
+                        className="h-[38px]"
                     />
                 </div>
                 <Button variant="outline" className="flex items-center gap-2">
@@ -125,9 +140,18 @@ export default function AuditLogsPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border text-sm">
-                            {auditLogs.map((log) => {
+                            {isLoading ? (
+                                <tr><td colSpan={6} className="text-center py-6 text-muted-foreground">Loading logs...</td></tr>
+                            ) : logs.length === 0 ? (
+                                <tr><td colSpan={6} className="text-center py-6 text-muted-foreground">No logs found.</td></tr>
+                            ) : logs.map((log) => {
                                 const isExpanded = expandedRows.includes(log.id);
-                                const hasError = log.status === "Failed";
+                                const hasError = log.status === "FAILED";
+                                
+                                const nameParts = log.employee?.fullName?.trim().split(/\s+/) || [];
+                                const initials = nameParts.length > 0 
+                                    ? nameParts.map((part: string) => part[0]).join("").toUpperCase().slice(0, 2)
+                                    : "EE";
 
                                 return (
                                     <Fragment key={log.id}>
@@ -143,25 +167,21 @@ export default function AuditLogsPage() {
                                                     </button>
                                                 )}
                                             </td>
-                                            <td className="py-3 px-4 whitespace-nowrap text-muted-foreground">{log.timestamp}</td>
+                                            <td className="py-3 px-4 whitespace-nowrap text-muted-foreground">{format(new Date(log.createdAt), 'yyyy-MM-dd HH:mm:ss')}</td>
                                             <td className="py-3 px-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-8 h-8 rounded-full overflow-hidden border border-border bg-muted flex items-center justify-center text-xs font-medium">
-                                                        {log.employee.avatar ? (
-                                                            <img src={log.employee.avatar} alt={log.employee.name} className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            log.employee.initials
-                                                        )}
+                                                        {initials}
                                                     </div>
                                                     <div>
-                                                        <div className="font-medium text-foreground">{log.employee.name}</div>
-                                                        <div className="text-xs text-muted-foreground">{log.employee.email}</div>
+                                                        <div className="font-medium text-foreground">{log.employee?.fullName}</div>
+                                                        <div className="text-xs text-muted-foreground">{log.employee?.personalEmail}</div>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="py-3 px-4">
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-border bg-background text-xs font-medium">
-                                                    {log.app.icon} {log.app.name}
+                                                    {getProviderIcon(log.provider)} {getProviderName(log.provider)}
                                                 </span>
                                             </td>
                                             <td className="py-3 px-4">
@@ -180,14 +200,14 @@ export default function AuditLogsPage() {
                                                 <td colSpan={6} className="p-0">
                                                     <div className="p-6 ml-12">
                                                         <div className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                                                            Error Details Payload
+                                                            Error Details
                                                         </div>
                                                         <div className="bg-zinc-950 text-zinc-50 rounded-lg p-4 font-mono text-xs overflow-x-auto shadow-inner border border-zinc-800">
-                                                            <pre><code>{log.errorPayload}</code></pre>
+                                                            <pre><code>{log.message || "Unknown Error"}</code></pre>
                                                         </div>
                                                         <div className="mt-4 flex gap-3">
                                                             <Button className="h-8 text-xs">Retry Action</Button>
-                                                            <Button variant="outline" className="h-8 text-xs">Copy Payload</Button>
+                                                            <Button variant="outline" className="h-8 text-xs">Copy Details</Button>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -203,11 +223,11 @@ export default function AuditLogsPage() {
                 {/* Pagination */}
                 <div className="border-t border-border bg-card p-4 flex items-center justify-between">
                     <div className="text-xs text-muted-foreground">
-                        Showing <span className="font-medium text-foreground">1</span> to <span className="font-medium text-foreground">10</span> of <span className="font-medium text-foreground">97</span> results
+                        Showing <span className="font-medium text-foreground">1</span> to <span className="font-medium text-foreground">{logs.length}</span> of <span className="font-medium text-foreground">{logs.length}</span> results
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" disabled>Previous</Button>
-                        <Button variant="outline" size="sm">Next</Button>
+                        <Button variant="outline" size="sm" disabled>Next</Button>
                     </div>
                 </div>
             </div>
