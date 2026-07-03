@@ -6,6 +6,7 @@ import { env } from '../config/env';
 import { WebClient } from '@slack/web-api';
 import { providerRegistry } from '../integrations/registry';
 import jwt from 'jsonwebtoken';
+import { deferredIntegrationQueue } from '../queues/deferred-integration.queue';
 
 export class IntegrationController {
   
@@ -41,8 +42,24 @@ export class IntegrationController {
       throw new AppError(403, ErrorCodes.FORBIDDEN_NO_ORG, 'Forbidden: No organization context');
     }
 
-    await prisma.integration.delete({
+    const integration = await prisma.integration.findUnique({
       where: { id, organizationId }
+    });
+
+    if (!integration) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Integration not found');
+    }
+
+    // Drain pending deferred jobs for this provider
+    const waiting = await deferredIntegrationQueue.getJobs(['waiting', 'delayed']);
+    for (const job of waiting) {
+      if (job.data?.provider === integration.provider) {
+        await job.remove();
+      }
+    }
+
+    await prisma.integration.delete({
+      where: { id }
     });
 
     return res.status(200).json({ message: 'Integration disconnected successfully' });

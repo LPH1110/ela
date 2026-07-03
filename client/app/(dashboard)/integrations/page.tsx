@@ -19,6 +19,17 @@ import {
 } from "lucide-react";
 import { IntegrationSetupModal, IntegrationPlatform } from "@/components/modals/integration-setup-modal";
 import { IntegrationMappingsModal } from "@/components/modals/integration-mappings-modal";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface IntegrationData {
     id: string;
@@ -142,6 +153,22 @@ function IntegrationsContent() {
         fetchIntegrations();
     }, []);
 
+    const handleDisconnect = async (id: string) => {
+        try {
+            const res = await api.delete(`/integrations/${id}`);
+            if (res.ok) {
+                toast.success("Integration disconnected successfully");
+                fetchIntegrations();
+            } else {
+                const data = await res.json().catch(() => ({}));
+                toast.error(data.error?.message || "Failed to disconnect integration");
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("An unexpected error occurred");
+        }
+    };
+
     // Helper to find the actual backend integration for a platform config
     const getBackendIntegration = (platformId: string) => {
         return activeIntegrations.find(i => i.provider.toLowerCase() === platformId.toLowerCase());
@@ -200,9 +227,30 @@ function IntegrationsContent() {
                                                 </Button>
                                             </IntegrationMappingsModal>
 
-                                            <Button variant="outline" size="sm" className="h-8 text-xs">
-                                                Sync
-                                            </Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="outline" size="sm" className="h-8 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground">
+                                                        Disconnect
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent className="sm:max-w-[425px]">
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Disconnect {config.name}?</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            This will remove the integration and delete all associated mappings. Any pending tasks for this provider will be canceled. This action cannot be undone.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction
+                                                            onClick={() => handleDisconnect(backendData.id)}
+                                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                        >
+                                                            Disconnect
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
                                         </>
                                     ) : (
                                         /* Truyền config tương ứng vào Modal để tạo mới kết nối */

@@ -40,9 +40,14 @@ export class EmailService {
       throw new Error('Failed to send email');
     }
   }
-  static async sendOnboardingWelcome(email: string, fullName: string, orgName: string, slackInviteLink?: string) {
-    const loginLink = `${env.CLIENT_URL}/login`;
-    
+  static async sendOnboardingWelcome(
+    email: string,
+    fullName: string,
+    orgName: string,
+    slackInviteLink?: string,
+    inviteToken?: string
+  ) {
+
     let slackHtml = '';
     if (slackInviteLink) {
       slackHtml = `
@@ -71,10 +76,18 @@ export class EmailService {
           ${slackHtml}
 
           <p>Please check your personal email or talk to your manager for your temporary passwords.</p>
-          <p>If you have been granted access to the ELA platform itself, you can log in below:</p>
-          <a href="${loginLink}" style="display: inline-block; padding: 10px 20px; margin: 10px 0 20px; background-color: #0f172a; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 500;">
-            Log In to ELA
-          </a>
+          
+          ${inviteToken ? `
+            <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
+              <h3 style="margin-top: 0; color: #0f172a;">👥 ELA Platform Access</h3>
+              <p style="color: #475569; margin-bottom: 16px;">
+                As a member of the HR team, you have been granted access to the ELA platform to help manage the employee lifecycle.
+              </p>
+              <a href="${env.CLIENT_URL}/login?inviteToken=${inviteToken}" style="display: inline-block; padding: 10px 20px; background-color: #0f172a; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 500;">
+                Accept Invitation & Log In
+              </a>
+            </div>
+          ` : ''}
         </div>
       `,
     };

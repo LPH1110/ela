@@ -5,10 +5,10 @@ import { OnboardingOrchestrator } from '../integrations/orchestrators/onboarding
 export const onboardingQueue = new Queue('onboardingQueue', { connection: redisConfig });
 
 export const onboardingWorker = new Worker('onboardingQueue', async (job: Job) => {
-  const { employeeId, organizationId } = job.data;
+  const { employeeId, organizationId, invitedById } = job.data;
   
   console.log(`[Onboarding Worker] Processing job ${job.id} for employee: ${employeeId}`);
-  await OnboardingOrchestrator.execute(employeeId, organizationId);
+  await OnboardingOrchestrator.execute(employeeId, organizationId, invitedById);
   console.log(`[Onboarding Worker] Completed job ${job.id}`);
 }, { connection: redisConfig });
 

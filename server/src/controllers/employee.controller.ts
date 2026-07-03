@@ -28,7 +28,11 @@ export class EmployeeController {
     });
 
     // Add to onboarding queue
-    await onboardingQueue.add('onboardEmployee', { employeeId: employee.id, organizationId });
+    await onboardingQueue.add('onboardEmployee', { 
+      employeeId: employee.id, 
+      organizationId,
+      invitedById: req.user?.sub 
+    });
 
     return res.status(201).json({ message: 'Employee created and onboarding started', data: employee });
   });

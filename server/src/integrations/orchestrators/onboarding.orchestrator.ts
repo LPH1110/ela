@@ -4,7 +4,10 @@ import { EmailService } from '../../services/email.service';
 import { deferredIntegrationQueue } from '../../queues/deferred-integration.queue';
 
 export class OnboardingOrchestrator {
-  static async execute(employeeId: string, organizationId: string): Promise<void> {
+  static async execute(
+    employeeId: string,
+    organizationId: string,
+    invitedById?: string): Promise<void> {
     // 1. Create a job log for onboarding process
     const log = await prisma.jobLog.create({
       data: {
@@ -31,7 +34,10 @@ export class OnboardingOrchestrator {
         status: allSucceeded ? 'SUCCESS' : 'PARTIAL_FAILURE',
         message: allSucceeded
           ? 'All integrations completed successfully.'
-          : `Partial failure: ${results.filter(r => !r.success).map(r => r.provider).join(', ')}`
+          : `Partial failure: ${results
+            .filter(r => !r.success)
+            .map(r => r.provider)
+            .join(', ')}`
       }
     });
 
@@ -78,14 +84,36 @@ export class OnboardingOrchestrator {
       console.log(`[OnboardingOrchestrator] Scheduled deferred SLACK onboarding for employee: ${employeeId}`);
     }
 
-    // 6. Send welcome email
+    // 6. Auto-invite HR employees to ELA platform
+    let inviteToken: string | undefined = undefined;
+
+    if (employee.department.toUpperCase() === 'HR' && invitedById) {
+      try {
+        const invitation = await prisma.invitation.create({
+          data: {
+            email: employee.personalEmail,
+            organizationId,
+            invitedById,
+            role: 'MEMBER', // Give them MEMBER role on ELA platform by default
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+          }
+        });
+        inviteToken = invitation.token;
+        console.log(`[OnboardingOrchestrator] Created ELA platform invitation for HR employee: ${employeeId}`);
+      } catch (inviteErr) {
+        console.error(`[OnboardingOrchestrator] Failed to create invitation for ${employee.personalEmail}`, inviteErr);
+      }
+    }
+
+    // 7. Send welcome email
     if (employee.personalEmail) {
       try {
         await EmailService.sendOnboardingWelcome(
           employee.personalEmail,
           employee.fullName,
           employee.organization.name,
-          slackInviteLink
+          slackInviteLink,
+          inviteToken
         );
       } catch (emailErr) {
         console.error(`[OnboardingOrchestrator] Failed to send email to ${employee.personalEmail}`, emailErr);
